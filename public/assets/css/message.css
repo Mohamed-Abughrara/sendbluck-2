@@ -1,0 +1,5 @@
+/* Applied inside the sandboxed reading-pane iframe only. */
+body { margin: 0; padding: 12px 14px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 15px; line-height: 1.55; color: #1c2430; overflow-wrap: anywhere; }
+a { color: #1a5fb4; }
+p { margin: 0 0 .8em; }
+ul, ol { padding-left: 1.5em; }

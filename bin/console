@@ -1,0 +1,83 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+use MailDesk\Domain\Shared\EmailAddress;
+use MailDesk\Domain\User\{User, UserRepositoryInterface};
+use MailDesk\Application\Port\PasswordHasherInterface;
+use MailDesk\Infrastructure\Persistence\Migrator;
+
+$root = dirname(__DIR__);
+$cmd = $argv[1] ?? 'help';
+
+if ($cmd === 'key:generate') {
+    require $root . '/vendor/autoload.php';
+    $line = 'APP_KEY=base64:' . base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+    $env = $root . '/.env';
+    if (!is_file($env)) {
+        copy($root . '/.env.example', $env);
+    }
+    $content = (string) file_get_contents($env);
+    if (preg_match('/^APP_KEY=base64:[A-Za-z0-9+\/=]{40,}$/m', $content) && !in_array('--force', $argv, true)) {
+        fwrite(STDERR, "APP_KEY already set. Changing it makes the saved SMTP password unrecoverable. Use --force to overwrite.\n");
+        exit(1);
+    }
+    $content = preg_match('/^APP_KEY=.*$/m', $content)
+        ? (string) preg_replace('/^APP_KEY=.*$/m', $line, $content)
+        : $content . PHP_EOL . $line . PHP_EOL;
+    file_put_contents($env, $content);
+    @chmod($env, 0600);
+    echo "APP_KEY written to .env\n";
+    exit(0);
+}
+
+[$container] = require $root . '/config/bootstrap.php';
+
+switch ($cmd) {
+    case 'migrate':
+        $applied = (new Migrator($container->get(PDO::class), $root . '/database/migrations'))->run();
+        echo $applied === [] ? "Nothing to migrate.\n" : 'Applied: ' . implode(', ', $applied) . "\n";
+        break;
+
+    case 'user:create':
+        $prompt = static function (string $label, bool $hidden = false): string {
+            echo $label . ': ';
+            if ($hidden && PHP_OS_FAMILY !== 'Windows' && function_exists('shell_exec')) {
+                shell_exec('stty -echo');
+                $v = trim((string) fgets(STDIN));
+                shell_exec('stty echo');
+                echo "\n";
+                return $v;
+            }
+            return trim((string) fgets(STDIN));
+        };
+        $name = $argv[2] ?? $prompt('Name');
+        $email = $argv[3] ?? $prompt('Email');
+        $password = $argv[4] ?? $prompt('Password (min 12 chars)', true);
+        try {
+            $addr = new EmailAddress($email);
+        } catch (Throwable) {
+            fwrite(STDERR, "Invalid email address.\n");
+            exit(1);
+        }
+        if ($name === '' || mb_strlen($name) > 100) {
+            fwrite(STDERR, "Name is required (max 100 characters).\n");
+            exit(1);
+        }
+        if (mb_strlen($password) < 12 || strlen($password) > 128) {
+            fwrite(STDERR, "Password must be 12-128 characters.\n");
+            exit(1);
+        }
+        $users = $container->get(UserRepositoryInterface::class);
+        if ($users->findByEmail($addr) !== null) {
+            fwrite(STDERR, "A user with this email already exists.\n");
+            exit(1);
+        }
+        $hash = $container->get(PasswordHasherInterface::class)->hash($password);
+        $id = $users->save(new User(null, $name, $addr, $hash), gmdate('Y-m-d H:i:s'));
+        echo "User #{$id} created ({$addr}).\n";
+        break;
+
+    default:
+        echo "MailDesk console\n  key:generate [--force]\n  migrate\n  user:create [name email password]\n";
+}

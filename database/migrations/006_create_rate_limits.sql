@@ -1,0 +1,5 @@
+CREATE TABLE rate_limits (
+  rl_key VARCHAR(190) NOT NULL PRIMARY KEY,
+  hits INTEGER NOT NULL,
+  window_start INTEGER NOT NULL
+){{ENGINE}};

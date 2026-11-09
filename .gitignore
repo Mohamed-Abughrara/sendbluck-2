@@ -1,8 +1,6 @@
 # CakePHP 3
-
 /vendor/*
 /config/app.php
-
 /tmp/cache/models/*
 !/tmp/cache/models/empty
 /tmp/cache/persistent/*
@@ -13,13 +11,22 @@
 !/tmp/sessions/empty
 /tmp/tests/*
 !/tmp/tests/empty
-
 /logs/*
 !/logs/empty
 
 # CakePHP 2
-
 /app/tmp/*
 /app/Config/core.php
 /app/Config/database.php
 /vendors/*
+
+# MailDesk local configuration and generated data
+.env
+/vendor/
+/storage/*
+!/storage/logs/
+/storage/logs/*
+!/storage/logs/.gitkeep
+!/storage/.gitkeep
+/.phpunit.cache/
+/.phpunit.result.cache
